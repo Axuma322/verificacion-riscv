@@ -34,11 +34,14 @@ module top;
 
   // 6. Bloque inicial de simulación
   initial begin
+    $dumpfile("dump.vcd"); // Nombre estándar usado por EPWave en EDAPlayground
+    $dumpvars(0, top);
+
     clk = 0;
     res = 1; 
     #25 res = 0; // Liberar reset después de unos ciclos
   end
 
   testcase test_inst(_if);
-  
+
 endmodule

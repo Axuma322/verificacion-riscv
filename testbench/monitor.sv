@@ -13,6 +13,7 @@ class monitor;
       @(posedge _if.clk);
       // Muestrear idata si no hay reset y la instrucción no es vacía o desconocida
       if (_if.res == 0 && _if.idata !== 32'hxxxxxxxx && _if.idata !== 32'h0) begin
+        $display("Monitor: Instruccion extraida del bus IDATA: %h", _if.idata);
         trans = new();
         trans.instr = _if.idata;
         
