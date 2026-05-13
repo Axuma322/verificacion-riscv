@@ -38,4 +38,7 @@ module top;
     res = 1; 
     #25 res = 0; // Liberar reset después de unos ciclos
   end
+
+  testcase test_inst(_if);
+  
 endmodule
