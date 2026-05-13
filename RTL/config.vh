@@ -143,7 +143,9 @@
 // is actived by the UART.
 `define __PERFMETER__
 
+`ifndef __ICARUS__
 `define __ICARUS__
+`endif
 
 // icarus register debug:
 //
