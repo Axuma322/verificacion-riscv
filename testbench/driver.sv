@@ -11,7 +11,7 @@ class driver;
 
   // Escribe las instrucciones aleatorias en el disco duro
   task load_memory();
-    file_id = $fopen("../RTL/darksocv.mem", "w");
+    file_id = $fopen("darksocv.mem", "w");
     while (gen_obj.mbx_gen_drv.size() > 0) begin
       trans = gen_obj.mbx_gen_drv.pop_front();
       $fdisplay(file_id, "%h", trans.instr); 
