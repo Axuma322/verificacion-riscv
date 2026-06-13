@@ -1,10 +1,4 @@
-`timescale 1ns/1ps
-
-`include "interface.sv"
-`include "stimulus.sv"
-`include "scoreboard.sv"
-`include "driver.sv"
-`include "monitor.sv"
-`include "env.sv"
-`include "test.sv"
-`include "top.sv"
+// Define el orden de compilacion del testbench UVM para EDAPlayground.
+`include "ifc_darksocv.sv"
+`include "darksocv_pkg.sv"
+`include "tb_top.sv"

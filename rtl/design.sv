@@ -1,0 +1,5 @@
+`include "config.vh"
+`include "darkpll.v"
+`include "darkuart.v"
+`include "darkriscv.v"
+`include "darksocv.v"
