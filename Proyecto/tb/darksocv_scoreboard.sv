@@ -9,6 +9,9 @@ class darksocv_scoreboard extends uvm_scoreboard;
     logic [31:0] ref_regs [0:15];
 
     int instr_count;
+    int instr_checks_executed;
+    int instr_checks_passed;
+    int instr_checks_failed;
     int checks_executed;
     int checks_passed;
     int checks_failed;
@@ -28,10 +31,13 @@ class darksocv_scoreboard extends uvm_scoreboard;
             ref_regs[i] = 32'h00000000;
         end
 
-        instr_count     = 0;
-        checks_executed = 0;
-        checks_passed   = 0;
-        checks_failed   = 0;
+        instr_count            = 0;
+        instr_checks_executed  = 0;
+        instr_checks_passed    = 0;
+        instr_checks_failed    = 0;
+        checks_executed        = 0;
+        checks_passed          = 0;
+        checks_failed          = 0;
     endfunction
 
     function logic [31:0] calc_result(darksocv_item item);
@@ -72,11 +78,13 @@ class darksocv_scoreboard extends uvm_scoreboard;
 
     function void write_mon(darksocv_item item);
         logic [31:0] expected;
+        logic [31:0] expected_observed;
 
         `uvm_info("SCB", $sformatf("Instruccion recibida: %s", item.convert2string()), UVM_MEDIUM)
 
         expected = calc_result(item);
         item.expected_value = expected;
+        expected_observed = (item.rd == 0) ? 32'h00000000 : expected;
 
         `uvm_info(
             "SCB",
@@ -89,6 +97,8 @@ class darksocv_scoreboard extends uvm_scoreboard;
             UVM_MEDIUM
         )
 
+        compare_instruction(item, expected_observed);
+
         if (item.rd != 0) begin
             ref_regs[item.rd] = expected;
         end
@@ -99,6 +109,40 @@ class darksocv_scoreboard extends uvm_scoreboard;
         if (item.has_final_snapshot) begin
             compare_final_snapshot(item);
             print_summary();
+        end
+    endfunction
+
+    function void compare_instruction(darksocv_item item, logic [31:0] expected_observed);
+        instr_checks_executed++;
+
+        if (expected_observed === item.observed_value) begin
+            instr_checks_passed++;
+
+            `uvm_info(
+                "SCB",
+                $sformatf(
+                    "PASS instr[%0d] %s: teorico=0x%08h experimental=0x%08h",
+                    item.item_index,
+                    item.asm_text,
+                    expected_observed,
+                    item.observed_value
+                ),
+                UVM_MEDIUM
+            )
+        end
+        else begin
+            instr_checks_failed++;
+
+            `uvm_error(
+                "SCB",
+                $sformatf(
+                    "FAIL instr[%0d] %s: teorico=0x%08h experimental=0x%08h",
+                    item.item_index,
+                    item.asm_text,
+                    expected_observed,
+                    item.observed_value
+                )
+            )
         end
     endfunction
 
@@ -140,8 +184,11 @@ class darksocv_scoreboard extends uvm_scoreboard;
         `uvm_info(
             "SCB",
             $sformatf(
-                "Resumen: instrucciones=%0d checks=%0d correctos=%0d fallidos=%0d",
+                "Resumen: instrucciones=%0d instr_checks=%0d instr_correctos=%0d instr_fallidos=%0d checks_finales=%0d finales_correctos=%0d finales_fallidos=%0d",
                 instr_count,
+                instr_checks_executed,
+                instr_checks_passed,
+                instr_checks_failed,
                 checks_executed,
                 checks_passed,
                 checks_failed
@@ -149,7 +196,10 @@ class darksocv_scoreboard extends uvm_scoreboard;
             UVM_MEDIUM
         )
 
-        if ((checks_executed == 16) && (checks_failed == 0)) begin
+        if ((instr_checks_executed == instr_count) &&
+            (instr_checks_failed == 0) &&
+            (checks_executed == 16) &&
+            (checks_failed == 0)) begin
             `uvm_info("SCB", "Resultado final: PASS", UVM_MEDIUM)
         end
         else begin

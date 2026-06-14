@@ -22,9 +22,9 @@ class darksocv_test extends uvm_test;
         phase.raise_objection(this);
 
         seq = darksocv_sequence::type_id::create("seq");
-        seq.num_items = 15;
+        seq.num_items = 40;
 
-        `uvm_info("TEST", "Se generaran dos instrucciones aleatorias", UVM_MEDIUM)
+        `uvm_info("TEST", "Se generaran 40 instrucciones aleatorias", UVM_MEDIUM)
 
         seq.start(env.agent.sequencer);
 

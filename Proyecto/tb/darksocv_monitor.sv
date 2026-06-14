@@ -141,9 +141,27 @@ class darksocv_monitor extends uvm_monitor;
         end
     endtask
 
+    task publish_item(darksocv_item item);
+        item.observed_value = vif.REGS[item.rd];
+
+        ap.write(item);
+
+        `uvm_info(
+            "MON",
+            $sformatf(
+                "Item publicado: %s rd=x%0d observed_value=0x%08h is_last=%0d",
+                item.asm_text,
+                item.rd,
+                item.observed_value,
+                item.is_last
+            ),
+            UVM_MEDIUM
+        )
+    endtask
+
     virtual task run_phase(uvm_phase phase);
         darksocv_item item;
-        darksocv_item observed_q[$];
+        darksocv_item pending_q[$];
 
         logic [31:0] final_regs [0:15];
         logic [31:0] prev_regs  [0:15];
@@ -207,6 +225,12 @@ class darksocv_monitor extends uvm_monitor;
             if (instr_word == 32'h0000006F) begin
                 jal_detected = 1'b1;
                 `uvm_info("MON", "Detectado jal x0, 0 final. Monitor detenido.", UVM_MEDIUM)
+
+                if (pending_q.size() > 0) begin
+                    item = pending_q.pop_front();
+                    publish_item(item);
+                end
+
                 break;
             end
 
@@ -216,7 +240,10 @@ class darksocv_monitor extends uvm_monitor;
             );
 
             if (decode_instr(instr_word, item)) begin
-                observed_q.push_back(item);
+                item.item_index         = observed_count;
+                item.is_last            = 1'b0;
+                item.has_final_snapshot = 1'b0;
+                pending_q.push_back(item);
 
                 `uvm_info(
                     "MON",
@@ -229,6 +256,11 @@ class darksocv_monitor extends uvm_monitor;
                 )
 
                 observed_count++;
+
+                if (pending_q.size() > 3) begin
+                    item = pending_q.pop_front();
+                    publish_item(item);
+                end
             end
         end
 
@@ -236,14 +268,14 @@ class darksocv_monitor extends uvm_monitor;
             `uvm_info("MON", "Timeout del monitor alcanzado antes de detectar jal final", UVM_MEDIUM)
         end
 
-        if (observed_q.size() == 0) begin
+        if (observed_count == 0) begin
             `uvm_error("MON", "No se observaron instrucciones soportadas")
         end
 
         if (jal_detected) begin
-            `uvm_info("MON", "Esperando ciclos extra antes del snapshot final de REGS", UVM_MEDIUM)
+            `uvm_info("MON", "Vaciando instrucciones pendientes antes del snapshot final de REGS", UVM_MEDIUM)
 
-            repeat (20) begin
+            while (pending_q.size() > 0) begin
                 @(posedge vif.XCLK);
                 reg_cycle++;
 
@@ -257,39 +289,25 @@ class darksocv_monitor extends uvm_monitor;
                 end
 
                 check_reg_changes(reg_cycle, vif.IADDR, instr_word, prev_regs);
-            end
-        end
 
-        for (int i = 0; i < 16; i++) begin
-            final_regs[i] = vif.REGS[i];
-        end
+                item = pending_q.pop_front();
 
-        foreach (observed_q[i]) begin
-            observed_q[i].item_index         = i;
-            observed_q[i].is_last            = (i == observed_q.size() - 1);
-            observed_q[i].has_final_snapshot = 1'b0;
-            observed_q[i].observed_value     = final_regs[observed_q[i].rd];
+                if (pending_q.size() == 0) begin
+                    item.is_last            = 1'b1;
+                    item.has_final_snapshot = 1'b1;
 
-            if (observed_q[i].is_last) begin
-                observed_q[i].has_final_snapshot = 1'b1;
-
-                for (int r = 0; r < 16; r++) begin
-                    observed_q[i].final_regs[r] = final_regs[r];
+                    for (int r = 0; r < 16; r++) begin
+                        final_regs[r]       = vif.REGS[r];
+                        item.final_regs[r]  = vif.REGS[r];
+                    end
                 end
+                else begin
+                    item.is_last            = 1'b0;
+                    item.has_final_snapshot = 1'b0;
+                end
+
+                publish_item(item);
             end
-
-            ap.write(observed_q[i]);
-
-            `uvm_info(
-                "MON",
-                $sformatf(
-                    "Item publicado: %s rd=x%0d final_rd_value=0x%08h",
-                    observed_q[i].asm_text,
-                    observed_q[i].rd,
-                    observed_q[i].observed_value
-                ),
-                UVM_MEDIUM
-            )
         end
     endtask
 
