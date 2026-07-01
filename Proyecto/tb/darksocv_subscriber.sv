@@ -20,19 +20,23 @@ class darksocv_subscriber extends uvm_subscriber #(darksocv_item);
         option.per_instance = 1;
 
         cp_instr_type: coverpoint cov_instr_type {
-            bins r_type = {INSTR_R};
-            bins i_type = {INSTR_I};
-            bins u_type = {INSTR_U};
+            bins r_type      = {INSTR_R};
+            bins i_type      = {INSTR_I};
+            bins u_type      = {INSTR_U};
+            bins load_type   = {INSTR_LOAD};
+            bins store_type  = {INSTR_STORE};
+            bins branch_type = {INSTR_BRANCH};
+            bins jump_type   = {INSTR_JUMP};
         }
 
         cp_op: coverpoint cov_op {
-            bins add  = {OP_ADD};
-            bins sub  = {OP_SUB};
-            bins and_ = {OP_AND};
-            bins or_  = {OP_OR};
-            bins xor_ = {OP_XOR};
-            bins addi = {OP_ADDI};
-            bins lui  = {OP_LUI};
+            bins r_ops[]      = {OP_ADD, OP_SUB, OP_SLL, OP_SLT, OP_SLTU, OP_XOR, OP_SRL, OP_SRA, OP_OR, OP_AND};
+            bins i_ops[]      = {OP_ADDI, OP_SLTI, OP_SLTIU, OP_XORI, OP_ORI, OP_ANDI, OP_SLLI, OP_SRLI, OP_SRAI};
+            bins u_ops[]      = {OP_LUI, OP_AUIPC};
+            bins load_ops[]   = {OP_LW};
+            bins store_ops[]  = {OP_SW};
+            bins branch_ops[] = {OP_BEQ, OP_BNE, OP_BLT, OP_BGE, OP_BLTU, OP_BGEU};
+            bins jump_ops[]   = {OP_JAL, OP_JALR};
         }
 
         cp_rd: coverpoint cov_rd {
@@ -75,14 +79,7 @@ class darksocv_subscriber extends uvm_subscriber #(darksocv_item);
             bins no = {1'b0};
         }
 
-        cross_type_op: cross cp_instr_type, cp_op {
-            ignore_bins r_invalid = binsof(cp_instr_type) intersect {INSTR_R} &&
-                                    binsof(cp_op) intersect {OP_ADDI, OP_LUI};
-            ignore_bins i_invalid = binsof(cp_instr_type) intersect {INSTR_I} &&
-                                    binsof(cp_op) intersect {OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_LUI};
-            ignore_bins u_invalid = binsof(cp_instr_type) intersect {INSTR_U} &&
-                                    binsof(cp_op) intersect {OP_ADD, OP_SUB, OP_AND, OP_OR, OP_XOR, OP_ADDI};
-        }
+        cross_type_op: cross cp_instr_type, cp_op;
         cross_type_rd: cross cp_instr_type, cp_rd;
         cross_op_result_zero: cross cp_op, cp_result_is_zero;
     endgroup

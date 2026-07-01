@@ -16,15 +16,58 @@ class darksocv_test extends uvm_test;
     endfunction
 
     virtual task run_phase(uvm_phase phase);
+        string seq_mode_name;
+        int plusarg_num_items;
+        int configured_num_items;
+        int configured_mode;
+
         super.run_phase(phase);
 
         `uvm_info("TEST", "Inicio de darksocv_test", UVM_MEDIUM)
         phase.raise_objection(this);
 
         seq = darksocv_sequence::type_id::create("seq");
-        seq.num_items = 40;
+        seq.num_items = 400;
 
-        `uvm_info("TEST", "Se generaran 40 instrucciones aleatorias", UVM_MEDIUM)
+        if ($value$plusargs("NUM_ITEMS=%0d", plusarg_num_items)) begin
+            seq.num_items = plusarg_num_items;
+        end
+
+        if ($value$plusargs("SEQ_MODE=%s", seq_mode_name)) begin
+            if (seq_mode_name == "R") begin
+                seq.seq_mode = 1;
+            end
+            else if (seq_mode_name == "I") begin
+                seq.seq_mode = 2;
+            end
+            else if (seq_mode_name == "U") begin
+                seq.seq_mode = 3;
+            end
+            else if (seq_mode_name == "LOAD") begin
+                seq.seq_mode = 4;
+            end
+            else if (seq_mode_name == "STORE") begin
+                seq.seq_mode = 5;
+            end
+            else if (seq_mode_name == "BRANCH") begin
+                seq.seq_mode = 6;
+            end
+            else if (seq_mode_name == "JUMP") begin
+                seq.seq_mode = 7;
+            end
+            else begin
+                seq.seq_mode = 0;
+            end
+        end
+
+        configured_num_items = seq.num_items;
+        configured_mode      = seq.seq_mode;
+
+        `uvm_info(
+            "TEST",
+            $sformatf("Se generaran %0d instrucciones aleatorias con seq_mode=%0d", configured_num_items, configured_mode),
+            UVM_MEDIUM
+        )
 
         seq.start(env.agent.sequencer);
 

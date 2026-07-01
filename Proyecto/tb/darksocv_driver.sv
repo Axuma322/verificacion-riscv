@@ -32,7 +32,7 @@ class darksocv_driver extends uvm_driver #(darksocv_item);
     endtask
 
     task write_instr(darksocv_item item);
-        if (item_count >= 63) begin
+        if (item_count >= 511) begin
             `uvm_fatal("DRV", "Demasiadas instrucciones: no queda espacio para jal final")
         end
 

@@ -35,6 +35,7 @@ class darksocv_monitor extends uvm_monitor;
 
         item.instr_word = instr;
         item.imm        = 32'h00000000;
+        item.rd         = 4'h0;
         item.rs1        = 4'h0;
         item.rs2        = 4'h0;
 
@@ -52,24 +53,59 @@ class darksocv_monitor extends uvm_monitor;
                 case ({funct7, funct3})
                     {7'b0000000, 3'b000}: item.op = OP_ADD;
                     {7'b0100000, 3'b000}: item.op = OP_SUB;
-                    {7'b0000000, 3'b111}: item.op = OP_AND;
-                    {7'b0000000, 3'b110}: item.op = OP_OR;
+                    {7'b0000000, 3'b001}: item.op = OP_SLL;
+                    {7'b0000000, 3'b010}: item.op = OP_SLT;
+                    {7'b0000000, 3'b011}: item.op = OP_SLTU;
                     {7'b0000000, 3'b100}: item.op = OP_XOR;
+                    {7'b0000000, 3'b101}: item.op = OP_SRL;
+                    {7'b0100000, 3'b101}: item.op = OP_SRA;
+                    {7'b0000000, 3'b110}: item.op = OP_OR;
+                    {7'b0000000, 3'b111}: item.op = OP_AND;
                     default: return 0;
                 endcase
             end
 
             7'b0010011: begin
-                if (funct3 != 3'b000 || rd5[4] || rs1_5[4]) begin
+                if (rd5[4] || rs1_5[4]) begin
                     return 0;
                 end
 
                 item.instr_type = INSTR_I;
-                item.op         = OP_ADDI;
                 item.rd         = rd5[3:0];
                 item.rs1        = rs1_5[3:0];
                 item.rs2        = 4'h0;
                 item.imm        = {{20{instr[31]}}, instr[31:20]};
+
+                case (funct3)
+                    3'b000: item.op = OP_ADDI;
+                    3'b010: item.op = OP_SLTI;
+                    3'b011: item.op = OP_SLTIU;
+                    3'b100: item.op = OP_XORI;
+                    3'b110: item.op = OP_ORI;
+                    3'b111: item.op = OP_ANDI;
+                    3'b001: begin
+                        if (funct7 != 7'b0000000) begin
+                            return 0;
+                        end
+
+                        item.op  = OP_SLLI;
+                        item.imm = {27'd0, rs2_5};
+                    end
+                    3'b101: begin
+                        if (funct7 == 7'b0000000) begin
+                            item.op = OP_SRLI;
+                        end
+                        else if (funct7 == 7'b0100000) begin
+                            item.op = OP_SRAI;
+                        end
+                        else begin
+                            return 0;
+                        end
+
+                        item.imm = {27'd0, rs2_5};
+                    end
+                    default: return 0;
+                endcase;
             end
 
             7'b0110111: begin
@@ -83,6 +119,93 @@ class darksocv_monitor extends uvm_monitor;
                 item.rs1        = 4'h0;
                 item.rs2        = 4'h0;
                 item.imm        = {12'h000, instr[31:12]};
+            end
+
+            7'b0010111: begin
+                if (rd5[4]) begin
+                    return 0;
+                end
+
+                item.instr_type = INSTR_U;
+                item.op         = OP_AUIPC;
+                item.rd         = rd5[3:0];
+                item.rs1        = 4'h0;
+                item.rs2        = 4'h0;
+                item.imm        = {12'h000, instr[31:12]};
+            end
+
+            7'b0000011: begin
+                if (funct3 != 3'b010 || rd5[4] || rs1_5[4]) begin
+                    return 0;
+                end
+
+                item.instr_type = INSTR_LOAD;
+                item.op         = OP_LW;
+                item.rd         = rd5[3:0];
+                item.rs1        = rs1_5[3:0];
+                item.rs2        = 4'h0;
+                item.imm        = {{20{instr[31]}}, instr[31:20]};
+            end
+
+            7'b0100011: begin
+                if (funct3 != 3'b010 || rs1_5[4] || rs2_5[4]) begin
+                    return 0;
+                end
+
+                item.instr_type = INSTR_STORE;
+                item.op         = OP_SW;
+                item.rd         = 4'h0;
+                item.rs1        = rs1_5[3:0];
+                item.rs2        = rs2_5[3:0];
+                item.imm        = {{20{instr[31]}}, instr[31:25], instr[11:7]};
+            end
+
+            7'b1100011: begin
+                if (rs1_5[4] || rs2_5[4]) begin
+                    return 0;
+                end
+
+                item.instr_type = INSTR_BRANCH;
+                item.rd         = 4'h0;
+                item.rs1        = rs1_5[3:0];
+                item.rs2        = rs2_5[3:0];
+                item.imm        = {{19{instr[31]}}, instr[31], instr[7], instr[30:25], instr[11:8], 1'b0};
+
+                case (funct3)
+                    3'b000: item.op = OP_BEQ;
+                    3'b001: item.op = OP_BNE;
+                    3'b100: item.op = OP_BLT;
+                    3'b101: item.op = OP_BGE;
+                    3'b110: item.op = OP_BLTU;
+                    3'b111: item.op = OP_BGEU;
+                    default: return 0;
+                endcase
+            end
+
+            7'b1101111: begin
+                if (rd5[4]) begin
+                    return 0;
+                end
+
+                item.instr_type = INSTR_JUMP;
+                item.op         = OP_JAL;
+                item.rd         = rd5[3:0];
+                item.rs1        = 4'h0;
+                item.rs2        = 4'h0;
+                item.imm        = {{11{instr[31]}}, instr[31], instr[19:12], instr[20], instr[30:21], 1'b0};
+            end
+
+            7'b1100111: begin
+                if (funct3 != 3'b000 || rd5[4] || rs1_5[4]) begin
+                    return 0;
+                end
+
+                item.instr_type = INSTR_JUMP;
+                item.op         = OP_JALR;
+                item.rd         = rd5[3:0];
+                item.rs1        = rs1_5[3:0];
+                item.rs2        = 4'h0;
+                item.imm        = {{20{instr[31]}}, instr[31:20]};
             end
 
             default: begin
@@ -168,7 +291,7 @@ class darksocv_monitor extends uvm_monitor;
         logic [31:0] instr_word;
 
         bit jal_detected;
-        bit seen_iaddr [0:63];
+        bit seen_iaddr [0:511];
 
         int word_index;
         int cycle_count;
@@ -180,7 +303,7 @@ class darksocv_monitor extends uvm_monitor;
         reg_cycle      = 0;
         jal_detected   = 1'b0;
 
-        for (int k = 0; k < 64; k++) begin
+        for (int k = 0; k < 512; k++) begin
             seen_iaddr[k] = 1'b0;
         end
 
@@ -207,11 +330,11 @@ class darksocv_monitor extends uvm_monitor;
                 continue;
             end
 
-            if (vif.IADDR >= 32'd256) begin
+            if (vif.IADDR >= 32'd2048) begin
                 continue;
             end
 
-            word_index = vif.IADDR[7:2];
+            word_index = vif.IADDR[10:2];
             instr_word = vif.MEM_WORD[word_index];
 
             check_reg_changes(reg_cycle, vif.IADDR, instr_word, prev_regs);
@@ -241,6 +364,7 @@ class darksocv_monitor extends uvm_monitor;
 
             if (decode_instr(instr_word, item)) begin
                 item.item_index         = observed_count;
+                item.pc                 = vif.IADDR;
                 item.is_last            = 1'b0;
                 item.has_final_snapshot = 1'b0;
                 pending_q.push_back(item);
@@ -281,8 +405,8 @@ class darksocv_monitor extends uvm_monitor;
 
                 if (!$isunknown(vif.IADDR) &&
                     (vif.IADDR[1:0] == 2'b00) &&
-                    (vif.IADDR < 32'd256)) begin
-                    instr_word = vif.MEM_WORD[vif.IADDR[7:2]];
+                    (vif.IADDR < 32'd2048)) begin
+                    instr_word = vif.MEM_WORD[vif.IADDR[10:2]];
                 end
                 else begin
                     instr_word = 32'h00000013;

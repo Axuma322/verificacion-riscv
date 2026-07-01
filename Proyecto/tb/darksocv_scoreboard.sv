@@ -7,6 +7,7 @@ class darksocv_scoreboard extends uvm_scoreboard;
     uvm_analysis_imp_mon #(darksocv_item, darksocv_scoreboard) mon_imp;
 
     logic [31:0] ref_regs [0:15];
+    logic [31:0] ref_mem [0:511];
 
     int instr_count;
     int instr_checks_executed;
@@ -31,6 +32,10 @@ class darksocv_scoreboard extends uvm_scoreboard;
             ref_regs[i] = 32'h00000000;
         end
 
+        for (int i = 0; i < 512; i++) begin
+            ref_mem[i] = 32'h00000013;
+        end
+
         instr_count            = 0;
         instr_checks_executed  = 0;
         instr_checks_passed    = 0;
@@ -41,6 +46,8 @@ class darksocv_scoreboard extends uvm_scoreboard;
     endfunction
 
     function logic [31:0] calc_result(darksocv_item item);
+        logic [31:0] addr;
+
         case (item.op)
             OP_ADD: begin
                 return ref_regs[item.rs1] + ref_regs[item.rs2];
@@ -48,6 +55,18 @@ class darksocv_scoreboard extends uvm_scoreboard;
 
             OP_SUB: begin
                 return ref_regs[item.rs1] - ref_regs[item.rs2];
+            end
+
+            OP_SLL: begin
+                return ref_regs[item.rs1] << ref_regs[item.rs2][4:0];
+            end
+
+            OP_SLT: begin
+                return ($signed(ref_regs[item.rs1]) < $signed(ref_regs[item.rs2])) ? 32'd1 : 32'd0;
+            end
+
+            OP_SLTU: begin
+                return (ref_regs[item.rs1] < ref_regs[item.rs2]) ? 32'd1 : 32'd0;
             end
 
             OP_AND: begin
@@ -62,12 +81,73 @@ class darksocv_scoreboard extends uvm_scoreboard;
                 return ref_regs[item.rs1] ^ ref_regs[item.rs2];
             end
 
+            OP_SRL: begin
+                return ref_regs[item.rs1] >> ref_regs[item.rs2][4:0];
+            end
+
+            OP_SRA: begin
+                return $signed(ref_regs[item.rs1]) >>> ref_regs[item.rs2][4:0];
+            end
+
             OP_ADDI: begin
                 return ref_regs[item.rs1] + item.imm;
             end
 
+            OP_SLTI: begin
+                return ($signed(ref_regs[item.rs1]) < $signed(item.imm)) ? 32'd1 : 32'd0;
+            end
+
+            OP_SLTIU: begin
+                return (ref_regs[item.rs1] < item.imm) ? 32'd1 : 32'd0;
+            end
+
+            OP_XORI: begin
+                return ref_regs[item.rs1] ^ item.imm;
+            end
+
+            OP_ORI: begin
+                return ref_regs[item.rs1] | item.imm;
+            end
+
+            OP_ANDI: begin
+                return ref_regs[item.rs1] & item.imm;
+            end
+
+            OP_SLLI: begin
+                return ref_regs[item.rs1] << item.imm[4:0];
+            end
+
+            OP_SRLI: begin
+                return ref_regs[item.rs1] >> item.imm[4:0];
+            end
+
+            OP_SRAI: begin
+                return $signed(ref_regs[item.rs1]) >>> item.imm[4:0];
+            end
+
             OP_LUI: begin
                 return {item.imm[19:0], 12'h000};
+            end
+
+            OP_AUIPC: begin
+                return item.pc + {item.imm[19:0], 12'h000};
+            end
+
+            OP_LW: begin
+                addr = ref_regs[item.rs1] + item.imm;
+                return ref_mem[addr[10:2]];
+            end
+
+            OP_SW: begin
+                return 32'h00000000;
+            end
+
+            OP_BEQ, OP_BNE, OP_BLT, OP_BGE, OP_BLTU, OP_BGEU: begin
+                return 32'h00000000;
+            end
+
+            OP_JAL, OP_JALR: begin
+                return item.pc + 32'd4;
             end
 
             default: begin
@@ -79,12 +159,13 @@ class darksocv_scoreboard extends uvm_scoreboard;
     function void write_mon(darksocv_item item);
         logic [31:0] expected;
         logic [31:0] expected_observed;
+        logic [31:0] addr;
 
         `uvm_info("SCB", $sformatf("Instruccion recibida: %s", item.convert2string()), UVM_MEDIUM)
 
         expected = calc_result(item);
         item.expected_value = expected;
-        expected_observed = (item.rd == 0) ? 32'h00000000 : expected;
+        expected_observed = (!item.writes_rd() || item.rd == 0) ? 32'h00000000 : expected;
 
         `uvm_info(
             "SCB",
@@ -99,7 +180,12 @@ class darksocv_scoreboard extends uvm_scoreboard;
 
         compare_instruction(item, expected_observed);
 
-        if (item.rd != 0) begin
+        if (item.op == OP_SW) begin
+            addr = ref_regs[item.rs1] + item.imm;
+            ref_mem[addr[10:2]] = ref_regs[item.rs2];
+        end
+
+        if (item.writes_rd() && item.rd != 0) begin
             ref_regs[item.rd] = expected;
         end
 

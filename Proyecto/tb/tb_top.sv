@@ -78,7 +78,7 @@ module tb_top;
             ifc_darksocv_obj.REGS[i] = dut.core0.REGS[i];
         end
 
-        for (int i = 0; i < 64; i++) begin
+        for (int i = 0; i < 512; i++) begin
             ifc_darksocv_obj.MEM_WORD[i] = dut.MEM[i];
         end
     end
