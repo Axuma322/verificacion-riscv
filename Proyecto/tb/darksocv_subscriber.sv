@@ -79,7 +79,15 @@ class darksocv_subscriber extends uvm_subscriber #(darksocv_item);
             bins no = {1'b0};
         }
 
-        cross_type_op: cross cp_instr_type, cp_op;
+        cross_type_op: cross cp_instr_type, cp_op {
+            ignore_bins r_invalid      = binsof(cp_instr_type.r_type)      && !binsof(cp_op.r_ops);
+            ignore_bins i_invalid      = binsof(cp_instr_type.i_type)      && !binsof(cp_op.i_ops);
+            ignore_bins u_invalid      = binsof(cp_instr_type.u_type)      && !binsof(cp_op.u_ops);
+            ignore_bins load_invalid   = binsof(cp_instr_type.load_type)   && !binsof(cp_op.load_ops);
+            ignore_bins store_invalid  = binsof(cp_instr_type.store_type)  && !binsof(cp_op.store_ops);
+            ignore_bins branch_invalid = binsof(cp_instr_type.branch_type) && !binsof(cp_op.branch_ops);
+            ignore_bins jump_invalid   = binsof(cp_instr_type.jump_type)   && !binsof(cp_op.jump_ops);
+        }
         cross_type_rd: cross cp_instr_type, cp_rd;
         cross_op_result_zero: cross cp_op, cp_result_is_zero;
     endgroup
